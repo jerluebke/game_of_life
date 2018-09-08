@@ -17,7 +17,7 @@ typedef enum state {
 } state;
 
 typedef struct Cell {
-    state current;
+    state isAlive;
     TPixel *pix;
     struct Cell *u, *ur, *r, *dr, *d, *dl, *l, *ul;
 } Cell;
@@ -25,11 +25,7 @@ typedef struct Cell {
 
 bool isWhite(TPixel *);
 
-void blackWhite(Tigr *);
-
 void initCells(Cell *, Tigr *, int);
-
-void nextGen(Cell *, Cell *);
 
 void setNextState(Cell *) /*, int *, int *, int *, int *) */;
 
@@ -44,7 +40,6 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    blackWhite(init);
     Tigr *screen = tigrWindow(init->w, init->h, TITLE, 0);
     tigrBlit(screen, init, 0, 0, 0, 0, init->w, init->h);
 
@@ -52,23 +47,15 @@ int main(int argc, char **argv)
     Cell *cells = malloc(tot * sizeof(Cell));
     initCells(cells, screen, tot);
 
-    tigrUpdate(screen);
-    Sleep(1000);
-
     while (!tigrClosed(screen) && !tigrKeyDown(screen, TK_ESCAPE)) {
-        int i = 0;
-        for (Cell *cur = cells; cur != cells+tot; ++cur, ++i) {
+        for (Cell *cur = cells; cur != cells+tot; ++cur)
             setNextState(cur) /* , &STAY_ALIVE[0], &STAY_ALIVE[2], &BE_BORN[0], &BE_BORN[1]) */;
-            /* fprintf(stderr, "%d (%d, %d)\n", i, i%screen->w, i/screen->h); */
-            /* if (!i%screen->w) */
-            /*     fputc('\n', stderr); */
-        }
 
         for (int i = 0; i < tot; ++i)
-            screen->pix[i] = cells[i].current == ALIVE ? BLACK : WHITE;
+            screen->pix[i] = cells[i].isAlive ? BLACK : WHITE;
 
         tigrUpdate(screen);
-        Sleep(1000);
+        Sleep(500);
     }
 
     free(cells);
@@ -80,17 +67,6 @@ int main(int argc, char **argv)
 bool isWhite(TPixel *pix)
 {
     return (pix->r==0xff && pix->g==0xff && pix->b==0xff && pix->a==0xff) ? true : false;
-}
-
-void blackWhite(Tigr *input)
-{
-    TPixel *data = input->pix;
-    TPixel *end = data + input->w*input->h;
-
-    for (; data != end; ++data) {
-        if (!isWhite(data))
-            *data = BLACK;
-    }
 }
 
 void initCells(Cell *cells, Tigr *screen, int tot)
@@ -115,7 +91,7 @@ void initCells(Cell *cells, Tigr *screen, int tot)
         cells[i].pix = &screen->pix[i];
 
         /* init current state */
-        cells[i].current = isWhite(cells[i].pix) ? DEAD : ALIVE;
+        cells[i].isAlive = isWhite(cells[i].pix) ? DEAD : ALIVE;
     }
 
     /* overwrite special cases */
@@ -151,24 +127,19 @@ void setNextState(Cell *cell) /*, int *alive_start, int *alive_end,
         int *born_start, int *born_end) */
 {
     int alive = 0;
-    alive = !isWhite(cell->u->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->ur->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->r->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->dr->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->d->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->dl->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->l->pix) ? alive+1 : alive;
-    alive = !isWhite(cell->ul->pix) ? alive+1 : alive;
+    alive += cell->u->isAlive ? 1 : 0;
+    alive += cell->ur->isAlive ? 1 : 0;
+    alive += cell->r->isAlive ? 1 : 0;
+    alive += cell->dr->isAlive ? 1 : 0;
+    alive += cell->d->isAlive ? 1 : 0;
+    alive += cell->dl->isAlive ? 1 : 0;
+    alive += cell->l->isAlive ? 1 : 0;
+    alive += cell->ul->isAlive ? 1 : 0;
 
-    /* if (alive) */
-    /*     fprintf(stderr, "alive neighbours = %d\n", alive); */
-
-    if (!isWhite(cell->pix) && !(alive == 2 || alive == 3)) {
-        cell->current = DEAD;
-    }
-    else if (isWhite(cell->pix) && alive == 3) {
-        cell->current = ALIVE;
-    }
+    if (cell->isAlive && !(alive == 2 || alive == 3))
+        cell->isAlive = DEAD;
+    else if (!cell->isAlive && alive == 3)
+        cell->isAlive = ALIVE;
 }
 
 inline bool intInArray(int i, int *start, int *end)
