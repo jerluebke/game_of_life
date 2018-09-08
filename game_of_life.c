@@ -47,7 +47,7 @@ int main(int argc, char **argv)
 
     /* parsing argv */
     struct parg_state ps;
-    int c, i, delay = 500, size = 2;
+    int c, i, delay = 100, size = 8;
     parg_init(&ps);
 
     while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:")) != -1) {
@@ -85,6 +85,7 @@ int main(int argc, char **argv)
         }
     }
 
+    /* set up rule */
     size_t a_len = strlen(ac);
     int *a = malloc(a_len * sizeof(*a));
     for (i = 0; ac[i] != '\0'; ++i)
@@ -106,14 +107,12 @@ int main(int argc, char **argv)
 
     Tigr *screen = tigrWindow(init->w, init->h, TITLE, 0);
     tigrBlit(screen, init, 0, 0, 0, 0, init->w, init->h);
+    /* tigrFill(screen, 0, 0, init->w, init->h, WHITE); */
 
     /* alloc and init cells */
     int tot = init->w * init->h;
     Cell *cells = malloc(tot * sizeof(*cells));
     initCells(cells, screen, tot);
-
-    tigrUpdate(screen);
-    Sleep(1000);
 
     /* mainloop */
     int iter = 0;
@@ -209,29 +208,23 @@ void initCells(Cell *cells, Tigr *screen, int tot)
 bool setNextState(Cell *cell, Rule *rule) {
     bool changed = false;
     int alive = 0;
-    /* for some reason checking for cell->isAlive yields a completely different
-     * and unexpected result compared to !isWhite(cell->pix) ... */
-    /* alive += !isWhite(cell->u->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->ur->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->r->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->dr->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->d->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->dl->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->l->pix) ? 1 : 0; */
-    /* alive += !isWhite(cell->ul->pix) ? 1 : 0; */
-    alive += cell->u->isAlive ? 1 : 0;
-    alive += cell->ur->isAlive ? 1 : 0;
-    alive += cell->r->isAlive ? 1 : 0;
-    alive += cell->dr->isAlive ? 1 : 0;
-    alive += cell->d->isAlive ? 1 : 0;
-    alive += cell->dl->isAlive ? 1 : 0;
-    alive += cell->l->isAlive ? 1 : 0;
-    alive += cell->ul->isAlive ? 1 : 0;
+    /* it is requiered to ask for the color of the pixel and not for the
+     * (during this iteration propably changed) state `isAlive` */
+    alive += !isWhite(cell->u->pix) ? 1 : 0;
+    alive += !isWhite(cell->ur->pix) ? 1 : 0;
+    alive += !isWhite(cell->r->pix) ? 1 : 0;
+    alive += !isWhite(cell->dr->pix) ? 1 : 0;
+    alive += !isWhite(cell->d->pix) ? 1 : 0;
+    alive += !isWhite(cell->dl->pix) ? 1 : 0;
+    alive += !isWhite(cell->l->pix) ? 1 : 0;
+    alive += !isWhite(cell->ul->pix) ? 1 : 0;
 
-    if (cell->isAlive && !intInArray(alive, *(rule->a), rule->a_len)) {
+    if (cell->isAlive && /*!(alive == 2 || alive == 3) */
+            !intInArray(alive, *(rule->a), rule->a_len)) {
         cell->isAlive = DEAD;
         changed = true;
-    } else if (!cell->isAlive && intInArray(alive, *(rule->b), rule->b_len)) {
+    } else if (!cell->isAlive && /* alive == 3 */
+             intInArray(alive, *(rule->b), rule->b_len)) {
         cell->isAlive = ALIVE;
         changed = true;
     }
@@ -239,12 +232,12 @@ bool setNextState(Cell *cell, Rule *rule) {
     return changed; 
 }
 
-inline bool intInArray(int s, int *arr, size_t len)
+bool intInArray(int s, int *arr, size_t len)
 {
-    bool found = false;
     size_t i;
 
     for (i = 0; i < len; ++i)
-        found = (s == arr[i]);
-    return found;
+        if (s == arr[i])
+            return true;
+    return false;
 }
