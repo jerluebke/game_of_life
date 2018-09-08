@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <time.h>
 #include <windows.h>
 #include "tigr.h"
 #include "parg.h"
 
 #define TITLE "Conway's Game of Life"
-#define HELP "Conway's Game of Life\nUsage: gol [-h] [-a STAY_ALIVE] [-b BE_BORN] [-d DELAY (1...1000)] [-f FILENAME] [-s SIZE (0, 2, 4, 8)]"
+#define HELP "Conway's Game of Life\nUsage: gol [-h] [-a STAY_ALIVE] [-b BE_BORN] [-d DELAY (1...1000)] [-f FILENAME] [-s SIZE (0, 2, 4, 8)] [-r] (random start)"
 
 const TPixel BLACK = {.r=0x00, .g=0x00, .b=0x00, .a=0xff};
 const TPixel WHITE = {.r=0xff, .g=0xff, .b=0xff, .a=0xff};
@@ -39,18 +40,28 @@ bool setNextState(Cell *, Rule *);
 
 bool intInArray(int, int *, size_t);
 
+int randint(int, int);
+
 
 int main(int argc, char **argv)
 {
+    srand(time(NULL));
+
     /* stay alive, be born, filename (default values) */
     char ac[8] = "23", bc[8] = "3", fn[100] = "initial.png";
 
+    int w = 100, h = 100, delay = 100, size = 8;
+    int prob_alive = 3125, total = 10000;
+    bool random = false;
+    Tigr *init;
+
+
     /* parsing argv */
     struct parg_state ps;
-    int c, i, delay = 100, size = 8;
+    int c;
     parg_init(&ps);
 
-    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:")) != -1) {
+    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:r")) != -1) {
         switch (c) {
         case 'h':
             printf(HELP);
@@ -79,6 +90,9 @@ int main(int argc, char **argv)
                 return EXIT_FAILURE;
             }
             break;
+        case 'r':
+            random = true;
+            break;
         default: /* '?'*/
             printf(HELP);
             return EXIT_FAILURE;
@@ -86,31 +100,47 @@ int main(int argc, char **argv)
     }
 
     /* set up rule */
+    int i;
+
     size_t a_len = strlen(ac);
     int *a = malloc(a_len * sizeof(*a));
     for (i = 0; ac[i] != '\0'; ++i)
         a[i] = ac[i] -'0';
+
     size_t b_len = strlen(bc);
     int *b = malloc(b_len * sizeof(*b));
     for (i = 0; bc[i] != '\0'; ++i)
         b[i] = bc[i] -'0';
-    Rule rule = { &a, &b, a_len, b_len };
 
-    printf("Using Rule %s/%s\nInitial conditions: %s\n", ac, bc, fn);
+    Rule rule = { &a, &b, a_len, b_len };
+    printf("Using Rule %s/%s\nInitial conditions: %s\n", ac, bc, random ? "random" : fn);
+
 
     /* read inital conditions and start display */
-    Tigr *init = tigrLoadImage(fn);
-    if (!init) {
-        fprintf(stderr, "Failed to open \"%s\". Terminating...", fn);
-        return EXIT_FAILURE;
+    if (random) {
+        init = tigrBitmap(w, h);
+        TPixel *data = init->pix, *end = init->pix + w*h;
+        while (data != end)
+            *data++ = randint(prob_alive, total) ? BLACK : WHITE;
+        /* tigrSaveImage("rand.png", init); */
+        /* return 0; */
+    }
+    else {
+        init = tigrLoadImage(fn);
+        if (!init) {
+            fprintf(stderr, "Failed to open \"%s\". Terminating...", fn);
+            return EXIT_FAILURE;
+        }
+        w = init->w, h = init->h;
     }
 
-    Tigr *screen = tigrWindow(init->w, init->h, TITLE, 0);
-    tigrBlit(screen, init, 0, 0, 0, 0, init->w, init->h);
+
+    Tigr *screen = tigrWindow(w, h, TITLE, 0);
+    tigrBlit(screen, init, 0, 0, 0, 0, w, h);
     /* tigrFill(screen, 0, 0, init->w, init->h, WHITE); */
 
     /* alloc and init cells */
-    int tot = init->w * init->h;
+    int tot = w * h;
     Cell *cells = malloc(tot * sizeof(*cells));
     initCells(cells, screen, tot);
 
@@ -140,6 +170,7 @@ int main(int argc, char **argv)
     free(a);
     free(b);
     free(cells);
+    tigrFree(screen);
     tigrFree(init);
 
     return EXIT_SUCCESS;
@@ -219,12 +250,10 @@ bool setNextState(Cell *cell, Rule *rule) {
     alive += !isWhite(cell->l->pix) ? 1 : 0;
     alive += !isWhite(cell->ul->pix) ? 1 : 0;
 
-    if (cell->isAlive && /*!(alive == 2 || alive == 3) */
-            !intInArray(alive, *(rule->a), rule->a_len)) {
+    if (cell->isAlive && !intInArray(alive, *(rule->a), rule->a_len)) {
         cell->isAlive = DEAD;
         changed = true;
-    } else if (!cell->isAlive && /* alive == 3 */
-             intInArray(alive, *(rule->b), rule->b_len)) {
+    } else if (!cell->isAlive && intInArray(alive, *(rule->b), rule->b_len)) {
         cell->isAlive = ALIVE;
         changed = true;
     }
@@ -240,4 +269,14 @@ bool intInArray(int s, int *arr, size_t len)
         if (s == arr[i])
             return true;
     return false;
+}
+
+/* returns 1 with a probability of prob/tot
+ * else returns 0 */
+int randint(int prob, int tot)
+{
+    int x = tot+1;
+    while (x > tot)
+        x = rand()/((RAND_MAX + 1u)/tot);
+    return x < prob ? 1 : 0;
 }
