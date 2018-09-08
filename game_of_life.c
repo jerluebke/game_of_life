@@ -67,8 +67,6 @@ int main(int argc, char **argv)
         for (int i = 0; i < tot; ++i)
             screen->pix[i] = cells[i].current == ALIVE ? BLACK : WHITE;
 
-        /* fputs("\n\n", stderr); */
-
         tigrUpdate(screen);
         Sleep(1000);
     }
@@ -99,56 +97,19 @@ void initCells(Cell *cells, Tigr *screen, int tot)
 {
     /* width and height of cells */
     int w = screen->w, h = screen->h;
+    int i;
 
     /* iterate over all cells and set neighbours */
-    for (int i = 0; i < tot; ++i) {
-        /* set references to neighbouring cells NULL */
-        cells[i].u = NULL, cells[i].ur = NULL, cells[i].r = NULL, cells[i].dr = NULL,
-            cells[i].d = NULL, cells[i].dl = NULL, cells[i].l = NULL, cells[i].ul = NULL;
-
-        /* special cases */
-        if (i < w) {    /* upmost and downmost rows */
-            cells[i].u = &cells[i+w*(h-1)];
-            cells[i+w*(h-1)].d = &cells[i];
-            cells[i].ur = &cells[i+w*(h-1)+1];
-            cells[i].ul = &cells[i+w*(h-1)-1];
-            cells[i+w*(h-1)].dr = &cells[i+1];
-            cells[i+w*(h-1)].dl = &cells[i-1];
-        }
-        if (!i%w) {     /* leftmost and rightmost columns*/
-            cells[i].l = &cells[i+w-1];
-            cells[i+w-1].r = &cells[i];
-            cells[i].ul = &cells[i-1];
-            cells[i].dl = &cells[i+2*w-1];
-            cells[i+w-1].ur = &cells[i-w];
-            cells[i+w-1].dr = &cells[i+w];
-        }
-        if (i == 0) {   /* upper left and lower right */
-            cells[i].ul = &cells[tot-1];
-            cells[tot-1].dr = &cells[i];
-        }
-        if (i == w-1) { /* upper right and lower left */
-            cells[i].ur = &cells[w*(h-1)];
-            cells[w*(h-1)].dl = &cells[i];
-        }
-
-        /* set remaining neighbours */
-        if (!cells[i].u)
-            cells[i].u = &cells[i-w];
-        if (!cells[i].ur)
-            cells[i].ur = &cells[i-w+1];
-        if (!cells[i].r)
-            cells[i].r = &cells[i+1];
-        if (!cells[i].dr)
-            cells[i].dr = &cells[i+w+1];
-        if (!cells[i].d)
-            cells[i].d = &cells[i+w];
-        if (!cells[i].dl)
-            cells[i].dl = &cells[i+w-1];
-        if (!cells[i].l)
-            cells[i].l = &cells[i-1];
-        if (!cells[i].ul)
-            cells[i].ul = &cells[i-w-1];
+    for (i = 0; i < tot; ++i) {
+        /* set neighbours */
+        cells[i].u = &cells[i-w];
+        cells[i].ur = &cells[i-w+1];
+        cells[i].r = &cells[i+1];
+        cells[i].dr = &cells[i+w+1];
+        cells[i].d = &cells[i+w];
+        cells[i].dl = &cells[i+w-1];
+        cells[i].l = &cells[i-1];
+        cells[i].ul = &cells[i-w-1];
 
         /* set pixel reference */
         cells[i].pix = &screen->pix[i];
@@ -156,6 +117,34 @@ void initCells(Cell *cells, Tigr *screen, int tot)
         /* init current state */
         cells[i].current = isWhite(cells[i].pix) ? DEAD : ALIVE;
     }
+
+    /* overwrite special cases */
+    /* upmost and downmost rows */
+    for (i = 0; i < w; ++i) {
+        cells[i].u = &cells[i+w*(h-1)];
+        cells[i+w*(h-1)].d = &cells[i];
+        cells[i].ur = &cells[i+w*(h-1)+1];
+        cells[i].ul = &cells[i+w*(h-1)-1];
+        cells[i+w*(h-1)].dr = &cells[i+1];
+        cells[i+w*(h-1)].dl = &cells[i-1];
+    }
+
+    /* leftmost and rightmost columns*/
+    for (i = 0; i < tot; i+=w) {
+        cells[i].l = &cells[i+w-1];
+        cells[i+w-1].r = &cells[i];
+        cells[i].ul = &cells[i-1];
+        cells[i].dl = &cells[i+2*w-1];
+        cells[i+w-1].ur = &cells[i-w];
+        cells[i+w-1].dr = &cells[i+w];
+    }
+
+    /* upper left and lower right corner*/
+    cells[0].ul = &cells[tot-1];
+    cells[tot-1].dr = &cells[0];
+    /* upper right and lower left corner */
+    cells[w-1].ur = &cells[w*(h-1)];
+    cells[w*(h-1)].dl = &cells[w-1];
 }
 
 void setNextState(Cell *cell) /*, int *alive_start, int *alive_end,
