@@ -55,7 +55,7 @@ int main(int argc, char **argv)
     int c, err;
     parg_init(&ps);
 
-    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:r:")) != -1) {
+    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:r:w:l:")) != -1) {
         switch (c) {
         case 'h':
             printf(HELP);
@@ -91,20 +91,25 @@ int main(int argc, char **argv)
         case 'r':
             random = true;
             prob_alive = 10000-atoi(ps.optarg);
-            if (prob_alive == 10000) {
+            if (prob_alive >= 10000 || prob_alive < 0) {
                 fputs("probability not understood...", stderr);
                 return EXIT_FAILURE;
             }
             break;
-        case '?': /* only for -r option - take default value */
-            if (ps.optopt == 'r') {
-                random = true;
-                break;
-            }
+        case 'w':
+            w = atoi(ps.optarg);
+            break;
+        case 'l':
+            h = atoi(ps.optarg);
+            break;
         default: /* '?'*/
             printf(HELP);
             return EXIT_FAILURE;
         }
+    }
+    if (!w || !h) {
+        fputs("width and height couldn't be read from arguments...", stderr);
+        return EXIT_FAILURE;
     }
 
     /* set up rule */
