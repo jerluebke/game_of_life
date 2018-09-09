@@ -1,13 +1,13 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <time.h>
+#include <time.h> /* to seed rand */
 #include <windows.h>
 #include "tigr.h"
 #include "parg.h"
+#include "util.h" /* includes stdlib.h, stdbool.h */
 
 #define TITLE "Conway's Game of Life"
-#define HELP "Conway's Game of Life\nUsage: gol [-h] [-a STAY_ALIVE] [-b BE_BORN] [-d DELAY (1...1000)] [-f FILENAME] [-s SIZE (0, 2, 4, 8)] [-r] (random start)"
+#define HELP "Conway's Game of Life\nUsage: gol [-h] [-a STAY_ALIVE] [-b BE_BORN] "\
+             "[-d DELAY (1...1000)] [-f FILENAME] [-s SIZE (0, 2, 4, 8)] [-r ALIVE_PROB (parts per 10,000)]"
 
 const TPixel BLACK = {.r=0x00, .g=0x00, .b=0x00, .a=0xff};
 const TPixel WHITE = {.r=0xff, .g=0xff, .b=0xff, .a=0xff};
@@ -19,8 +19,6 @@ typedef enum state {
 
 typedef struct Cell {
     state isAlive;
-    /* the TPixel attribute would not be requiered if not for some strange
-     * behaviour in `setNextState` (Details see comments there) */
     TPixel *pix;
     struct Cell *u, *ur, *r, *dr, *d, *dl, *l, *ul;
 } Cell;
@@ -38,10 +36,6 @@ void initCells(Cell *, Tigr *, int);
 
 bool setNextState(Cell *, Rule *);
 
-bool intInArray(int, int *, size_t);
-
-int randint(int, int);
-
 
 int main(int argc, char **argv)
 {
@@ -51,17 +45,17 @@ int main(int argc, char **argv)
     char ac[8] = "23", bc[8] = "3", fn[100] = "initial.png";
 
     int w = 100, h = 100, delay = 100, size = 8;
-    int prob_alive = 3125, total = 10000;
+    int prob_alive = 10000-3125, total = 10000;
     bool random = false;
     Tigr *init;
 
 
     /* parsing argv */
     struct parg_state ps;
-    int c;
+    int c, err;
     parg_init(&ps);
 
-    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:r")) != -1) {
+    while ((c = parg_getopt(&ps, argc, argv, "ha:b:d:f:s:r:")) != -1) {
         switch (c) {
         case 'h':
             printf(HELP);
@@ -80,7 +74,11 @@ int main(int argc, char **argv)
             }
             break;
         case 'f':
-            strncpy_s(fn, 100, ps.optarg, 100);
+            err = strncpy_s(fn, 100, ps.optarg, 100);
+            if (err) {
+                fputs("failed to read filename from arguments...", stderr);
+                return EXIT_FAILURE;
+            }
             break;
         case 's':
             size = atoi(ps.optarg);
@@ -92,7 +90,17 @@ int main(int argc, char **argv)
             break;
         case 'r':
             random = true;
+            prob_alive = 10000-atoi(ps.optarg);
+            if (prob_alive == 10000) {
+                fputs("probability not understood...", stderr);
+                return EXIT_FAILURE;
+            }
             break;
+        case '?': /* only for -r option - take default value */
+            if (ps.optopt == 'r') {
+                random = true;
+                break;
+            }
         default: /* '?'*/
             printf(HELP);
             return EXIT_FAILURE;
@@ -236,7 +244,8 @@ void initCells(Cell *cells, Tigr *screen, int tot)
     cells[w*(h-1)].dl = &cells[w-1];
 }
 
-bool setNextState(Cell *cell, Rule *rule) {
+bool setNextState(Cell *cell, Rule *rule)
+{
     bool changed = false;
     int alive = 0;
     /* it is requiered to ask for the color of the pixel and not for the
@@ -259,24 +268,4 @@ bool setNextState(Cell *cell, Rule *rule) {
     }
 
     return changed; 
-}
-
-bool intInArray(int s, int *arr, size_t len)
-{
-    size_t i;
-
-    for (i = 0; i < len; ++i)
-        if (s == arr[i])
-            return true;
-    return false;
-}
-
-/* returns 1 with a probability of prob/tot
- * else returns 0 */
-int randint(int prob, int tot)
-{
-    int x = tot+1;
-    while (x > tot)
-        x = rand()/((RAND_MAX + 1u)/tot);
-    return x < prob ? 1 : 0;
 }
